@@ -1,1 +1,429 @@
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Yamba Muno - Fundraising Uganda</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Arial}
+  body{background:#f5f7fa;color:#333}
+  header{background:#006400;color:white;padding:12px 15px;text-align:center;position:relative;display:flex;align-items:center;justify-content:center}
+  header h1{font-size:20px}
+  header p{font-size:12px;opacity:0.9}
+.admin-icon{position:absolute;left:15px;top:12px;background:none;border:none;font-size:24px;cursor:pointer;color:white}
+.admin-banner{width:100%;max-height:250px;object-fit:cover;margin-bottom:15px;border-radius:10px}
+.container{max-width:900px;margin:20px auto;padding:15px}
+.card{background:white;border-radius:12px;padding:20px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,0.1)}
+.phone-group{display:flex;gap:0;align-items:center;margin-bottom:8px}
+.phone-group.prefix{padding:12px;border-radius:8px 0 0 8px;font-weight:bold;display:flex;align-items:center;gap:6px;background:#eee}
+.phone-group input{border-radius:0 8px 8px 0;flex:1}
+.label-mtn{color:#d4a000;font-weight:bold}
+.label-airtel{color:#cc0000;font-weight:bold}
+  input,textarea{width:100%;padding:12px;margin:8px 0;border:1px solid #ddd;border-radius:8px;font-size:16px}
+  input.error{border:2px solid red;background:#ffe6e6}
+.error-text{color:red;font-size:12px;margin-top:-5px;margin-bottom:5px}
+  button{background:#006400;color:white;padding:14px 20px;border:none;border-radius:8px;cursor:pointer;font-weight:bold;width:100%;font-size:16px}
+  button:hover{background:#004d00}
+  button.danger{background:#cc0000}
+  button.warn{background:#ff9800}
+.btn-mtn{background:#ffcc00;color:#000;display:flex;align-items:center;justify-content:center;gap:8px}
+.btn-airtel{background:#e60000;color:white;display:flex;align-items:center;justify-content:center;gap:8px}
+.btn-bank{background:#0047ab;display:flex;align-items:center;justify-content:center;gap:8px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  img,video{max-width:100%;border-radius:10px;margin:10px 0}
+.hidden{display:none}
+.progress{height:20px;background:#eee;border-radius:10px;overflow:hidden;margin:10px 0}
+.progress-bar{height:100%;background:#006400;text-align:center;color:white;font-size:12px;line-height:20px}
+.message{padding:10px;background:#e8f5e9;border-left:4px solid #006400;margin:8px 0;border-radius:5px}
+.donate-option{padding:15px;border:1px solid #ddd;border-radius:10px;margin:10px 0;text-align:left}
+.donate-option h4{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.loading{color:#006400;text-align:center;padding:20px}
+</style>
+</head>
+<body>
+<header>
+  <button class="admin-icon" onclick="showAdminLogin()">💚</button>
+  <div>
+    <h1>YAMBA MUNO</h1>
+    <p>Help Ugandans Fundraise For Their Cause</p>
+  </div>
+</header>
+
+<div class="container">
+  <img id="adminBanner" class="admin-banner hidden">
+  <div id="app"><div class="loading">Loading Yamba Muno...</div></div>
+  <div id="dashboard"></div>
+  <div id="admin"></div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
+  import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+  import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-storage.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyApNYOw-a9w7m51JCCOhP0EVRiVyx5JPrw",
+    authDomain: "yamba-muno.firebaseapp.com",
+    projectId: "yamba-muno",
+    storageBucket: "yamba-muno.firebasestorage.app",
+    messagingSenderId: "507076898780",
+    appId: "1:507076898780:web:c742dfcadbe635a568a919"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const storage = getStorage(app);
+
+  const ADMIN_EMAIL_LOGIN = "admin@yambamuno.com";
+  const ADMIN_PASS_LOGIN = "Kalungi123";
+  const ADMIN_NAME_LOGIN = "Lubinga Alosious";
+  const ADMIN_MTN = "+256788417769";
+  const ADMIN_AIRTEL = "+256780420041";
+
+  let currentUser = JSON.parse(sessionStorage.getItem('ym_current')) || null;
+  let users = [], fundraisers = [], donations = [], messages = [], settings = {banner:""};
+
+  async function loadAllData(){
+    try{
+      const usersSnap = await getDocs(collection(db, "users"));
+      users = usersSnap.docs.map(d=>({id:d.id,...d.data()}));
+
+      const fundsSnap = await getDocs(collection(db, "fundraisers"));
+      fundraisers = fundsSnap.docs.map(d=>({id:d.id,...d.data()}));
+
+      const donSnap = await getDocs(collection(db, "donations"));
+      donations = donSnap.docs.map(d=>({id:d.id,...d.data()}));
+
+      const msgSnap = await getDocs(collection(db, "messages"));
+      messages = msgSnap.docs.map(d=>({id:d.id,...d.data()}));
+
+      const settingsSnap = await getDocs(collection(db, "settings"));
+      if(!settingsSnap.empty) settings = settingsSnap.docs[0].data();
+      if(settings.banner){ adminBanner.src = settings.banner; adminBanner.classList.remove('hidden'); }
+
+      const urlParams = new URLSearchParams(window.location.search);
+      if(urlParams.has('fund')){ showPublicPage(urlParams.get('fund')); }
+      else if(currentUser){ currentUser.id === "admin"? showAdmin() : showDashboard(); }
+      else{ showAuthPage(); }
+    }catch(e){
+      app.innerHTML = `<div class="card"><h2>Error Loading</h2><p>${e.message}</p><button onclick="location.reload()">Reload</button></div>`
+    }
+  }
+  loadAllData();
+
+  function saveSession(user){ currentUser = user; sessionStorage.setItem('ym_current', JSON.stringify(user)); }
+
+  function showAuthPage(){
+    app.innerHTML = `
+    <div class="card">
+      <h2>Start Your Fundraiser</h2>
+      <p style="font-size:12px;margin-bottom:10px">Only for people who want to receive donations</p>
+      <input id="authName" placeholder="Full Names">
+      <div class="phone-group">
+        <div class="prefix">+256</div>
+        <input id="authPhone" placeholder="788417769" type="tel" maxlength="9" inputmode="numeric">
+      </div>
+      <input id="authPass" type="password" placeholder="Create Password">
+      <button onclick="signup()">Create Account</button>
+      <button onclick="login()" style="background:#555;margin-top:10px">Login</button>
+    </div>
+    `;
+  }
+
+  window.showAdminLogin = function(){
+    const email = prompt("Admin Email:");
+    const pass = prompt("Admin Password:");
+    if(email==ADMIN_EMAIL_LOGIN && pass==ADMIN_PASS_LOGIN){
+      saveSession({name:"Admin", id:"admin", email:ADMIN_EMAIL_LOGIN});
+      showAdmin();
+    }else{ alert("Wrong Admin Details. Use: admin@yambamuno.com / Kalungi123"); }
+  }
+
+  function formatPhone(num){ return "+256" + num.replace(/\D/g,'').slice(-9); }
+
+  window.signup = async function(){
+    clearErrors();
+    const name = document.getElementById('authName').value.trim();
+    const phone = formatPhone(document.getElementById('authPhone').value);
+    const pass = document.getElementById('authPass').value;
+    let hasError = false;
+    if(!name){ setError(document.getElementById('authName'), "Full names required"); hasError=true; }
+    if(document.getElementById('authPhone').value.length!=9){ setError(document.getElementById('authPhone'), "Enter exactly 9 digits"); hasError=true; }
+    if(!pass){ setError(document.getElementById('authPass'), "Password required"); hasError=true; }
+    if(hasError) return;
+    if(users.find(u=>u.phone==phone)) return alert("User exists");
+    await addDoc(collection(db, "users"), {name, phone, pass});
+    alert("Account created. Login to start"); loadAllData();
+  }
+
+  window.login = async function(){
+    const phone = formatPhone(document.getElementById('authPhone').value);
+    const pass = document.getElementById('authPass').value;
+    let user = users.find(u=>u.phone==phone && u.pass==pass);
+    if(!user) return alert("Wrong details");
+    saveSession(user); showDashboard();
+  }
+
+  function setError(input, msg){
+    input.classList.add('error');
+    let err = document.createElement('div');
+    err.className = 'error-text';
+    err.innerText = msg;
+    input.after(err);
+  }
+  function clearErrors(){
+    document.querySelectorAll('.error-text').forEach(e=>e.remove());
+    document.querySelectorAll('.error').forEach(e=>e.classList.remove('error'));
+  }
+
+  window.showDashboard = function(){
+    app.innerHTML = "";
+    let dash = document.getElementById('dashboard');
+    dash.classList.remove('hidden');
+
+    let myFund = fundraisers.find(f=>f.userId==currentUser.id);
+    let myMessages = messages.filter(m=>m.to==currentUser.id);
+
+    let inboxHTML = "";
+    if(myMessages.length>0){
+      inboxHTML = `<div class="card"><h3>📩 Messages from Admin</h3>`;
+      myMessages.forEach(m=>{ inboxHTML += `<div class="message"><b>${m.date}</b><p>${m.text}</p></div>`; });
+      inboxHTML += `</div>`;
+    }
+
+    let paySection = "";
+    if(myFund && myFund.status=="pending"){
+      paySection = `
+      <div class="card">
+        <h3>Step 2: Activate Your Link - Pay 5000 UGX</h3>
+        <p>Send to: <b>MTN ${ADMIN_MTN}</b> or <b>Airtel ${ADMIN_AIRTEL}</b><br>Names: <b>${ADMIN_NAME_LOGIN}</b></p>
+        <input id="proofUpload" type="file" accept="image/*">
+        <button onclick="submitProof('${myFund.id}')">Upload Payment Proof</button>
+      </div>`;
+    }
+    if(myFund && myFund.status=="approved"){
+      const link = window.location.origin + window.location.pathname + "?fund=" + myFund.id;
+      paySection = `<div class="card"><h3>✅ Your Link is Active - Share This</h3>
+        <input value="${link}" readonly>
+        <button onclick="navigator.clipboard.writeText('${link}')">📋 Copy Link</button>
+      </div>`;
+    }
+
+    dash.innerHTML = `
+      <div class="card">
+        <h2>Welcome, ${currentUser.name}</h2>
+        <button class="danger" onclick="logout()" style="float:right;width:auto;padding:8px 15px">Logout</button>
+      </div>
+      ${inboxHTML}
+      ${!myFund? `
+      <div class="card">
+        <h3>Step 1: Create Your Fundraiser</h3>
+        <div id="errorBox"></div>
+        <input id="fundTitle" placeholder="What are you fundraising for?">
+        <input id="fundTarget" type="number" placeholder="Target Amount UGX e.g 500000">
+        <textarea id="fundStory" placeholder="Tell your story / problem"></textarea>
+        <input id="fundMedia" type="file" accept="image/*,video/*">
+        <h4>Your Bank Details - Must match your names</h4>
+        <input id="bankName" placeholder="Bank Name">
+        <input id="bankHolder" placeholder="Account Names Registered">
+        <input id="bankAccount" placeholder="Account Number">
+        <input id="swiftCode" placeholder="SWIFT Code">
+        <h4>Your Mobile Money - Uganda Only</h4>
+        <div class="phone-group">
+          <div class="prefix label-mtn">MTN +256</div>
+          <input id="mtnNumber" placeholder="788417769" type="tel" maxlength="9" inputmode="numeric">
+        </div>
+        <div class="phone-group">
+          <div class="prefix label-airtel">AIRTEL +256</div>
+          <input id="airtelNumber" placeholder="780420041" type="tel" maxlength="9" inputmode="numeric">
+        </div>
+        <button onclick="saveFundraiser()">Save & Continue to Payment</button>
+      </div>` : paySection }
+    `;
+  }
+
+  window.saveFundraiser = async function(){
+    clearErrors();
+    document.getElementById('errorBox').innerHTML = "";
+    let hasError = false; let errorList = [];
+
+    if(!document.getElementById('fundTitle').value.trim()){ errorList.push("Enter what you are fundraising for"); hasError=true; }
+    if(!document.getElementById('fundTarget').value || document.getElementById('fundTarget').value<1000){ errorList.push("Target must be 1000 UGX or more"); hasError=true; }
+    if(!document.getElementById('fundStory').value.trim()){ errorList.push("Tell your story"); hasError=true; }
+    if(!document.getElementById('fundMedia').files[0]){ errorList.push("Upload a picture or video"); hasError=true; }
+    if(!document.getElementById('bankName').value.trim()){ errorList.push("Bank name required"); hasError=true; }
+    if(!document.getElementById('bankHolder').value.trim()){ errorList.push("Account names required"); hasError=true; }
+    if(!document.getElementById('bankAccount').value.trim()){ errorList.push("Account number required"); hasError=true; }
+
+    const mtn = document.getElementById('mtnNumber').value? formatPhone(document.getElementById('mtnNumber').value) : "";
+    const airtel = document.getElementById('airtelNumber').value? formatPhone(document.getElementById('airtelNumber').value) : "";
+    if(!document.getElementById('mtnNumber').value &&!document.getElementById('airtelNumber').value){ errorList.push("Enter at least 1 MM number"); hasError=true; }
+    if(document.getElementById('mtnNumber').value && document.getElementById('mtnNumber').value.length!=9){ errorList.push("MTN must be 9 digits"); hasError=true; }
+    if(document.getElementById('airtelNumber').value && document.getElementById('airtelNumber').value.length!=9){ errorList.push("Airtel must be 9 digits"); hasError=true; }
+
+    if(hasError){
+      document.getElementById('errorBox').innerHTML = `<div style="background:#ffe6e6;padding:10px;border-radius:8px;margin-bottom:10px;color:red">${errorList.join('<br>')}</div>`;
+      return;
+    }
+
+    const file = document.getElementById('fundMedia').files[0];
+    const storageRef = ref(storage, `fundraisers/${Date.now()}_${file.name}`);
+    const snap = await uploadBytes(storageRef, file);
+    const url = await getDownloadURL(snap.ref);
+
+    await addDoc(collection(db, "fundraisers"), {
+      userId:currentUser.id, title:document.getElementById('fundTitle').value, target:parseInt(document.getElementById('fundTarget').value),
+      story:document.getElementById('fundStory').value, media:url, bankName:document.getElementById('bankName').value, bankHolder:document.getElementById('bankHolder').value,
+      bankAccount:document.getElementById('bankAccount').value, swift:document.getElementById('swiftCode').value, mtn:mtn, airtel:airtel, status:"pending", proof:""
+    });
+    alert("✅ Saved! Now go to Step 2: Upload Payment");
+    loadAllData();
+  }
+
+  window.submitProof = async function(fundId){
+    const file = document.getElementById('proofUpload').files[0];
+    if(!file){ alert("Upload screenshot of payment"); return; }
+    const storageRef = ref(storage, `proofs/${Date.now()}_${file.name}`);
+    const snap = await uploadBytes(storageRef, file);
+    const url = await getDownloadURL(snap.ref);
+    await updateDoc(doc(db, "fundraisers", fundId), {proof:url});
+    alert("Proof submitted. Wait for admin approval"); loadAllData();
+  }
+
+  window.showAdmin = async function(){
+    app.innerHTML = ""; dashboard.innerHTML = "";
+    admin.classList.remove('hidden');
+    admin.innerHTML = `
+    <h2>🔒 Admin Panel - ${ADMIN_NAME_LOGIN}</h2>
+    <div class="card">
+      <h3>Upload Banner</h3>
+      <input id="bannerUpload" type="file" accept="image/*">
+      <button onclick="uploadBanner()">Upload Banner</button>
+    </div>
+    <h3>All Users Who Joined</h3>
+    <div id="allUsers"></div>
+    <h3>Pending Approvals</h3>
+    <div id="pendingFunds"></div>
+    <button onclick="logout()">Logout</button>
+    `;
+    loadAdminData();
+  }
+
+  window.uploadBanner = async function(){
+    const file = document.getElementById('bannerUpload').files[0];
+    const storageRef = ref(storage, `banner/${Date.now()}_${file.name}`);
+    const snap = await uploadBytes(storageRef, file);
+    const url = await getDownloadURL(snap.ref);
+    const settingsSnap = await getDocs(collection(db, "settings"));
+    if(settingsSnap.empty) await addDoc(collection(db, "settings"), {banner:url});
+    else await updateDoc(doc(db, "settings", settingsSnap.docs[0].id), {banner:url});
+    adminBanner.src = url; adminBanner.classList.remove('hidden');
+  }
+
+  async function loadAdminData(){
+    allUsers.innerHTML = "";
+    users.forEach(u=>{
+      let fund = fundraisers.find(f=>f.userId==u.id);
+      allUsers.innerHTML += `<div class="card">
+        <p><b>${u.name}</b> - ${u.phone}</p>
+        <p>Status: ${fund? fund.status : "No Fundraiser Yet"}</p>
+        <textarea id="msg${u.id}" placeholder="Write message to ${u.name}"></textarea>
+        <div class="grid">
+          <button class="warn" onclick="sendMessage('${u.id}')">Send Message</button>
+          <button class="danger" onclick="deleteUser('${u.id}')">Delete User</button>
+        </div>
+      </div>`;
+    });
+
+    pendingFunds.innerHTML = "";
+    fundraisers.filter(f=>f.status=="pending" && f.proof).forEach(f=>{
+      let user = users.find(u=>u.id==f.userId);
+      pendingFunds.innerHTML += `<div class="card">
+        <h4>${f.title} by ${user.name}</h4>
+        <img src="${f.proof}" style="max-height:200px">
+        <div class="grid">
+          <button onclick="approveFund('${f.id}')">✅ Approve</button>
+          <button class="warn" onclick="warnUser('${user.id}')">⚠️ Warn</button>
+          <button class="danger" onclick="rejectFund('${f.id}')">❌ Reject</button>
+        </div>
+      </div>`;
+    });
+  }
+
+  window.sendMessage = async function(userId){
+    const text = document.getElementById(`msg${userId}`).value;
+    if(!text) return alert("Write a message");
+    await addDoc(collection(db, "messages"), {to:userId, from:"Admin", text:text, date:new Date().toLocaleString()});
+    alert("Message sent"); loadAllData();
+  }
+
+  window.warnUser = async function(userId){
+    const warning = `Hello, Your payment proof is invalid. Please pay 5000 UGX to MTN ${ADMIN_MTN} or Airtel ${ADMIN_AIRTEL} in names of ${ADMIN_NAME_LOGIN} and upload real proof. If you don't pay in 24 hours, account will be deleted.`;
+    await addDoc(collection(db, "messages"), {to:userId, from:"Admin", text:warning, date:new Date().toLocaleString()});
+    alert("Warning sent");
+  }
+
+  window.approveFund = async function(id){ await updateDoc(doc(db, "fundraisers", id), {status:"approved"}); alert("Approved"); loadAllData(); }
+  window.rejectFund = async function(id){ await updateDoc(doc(db, "fundraisers", id), {status:"pending", proof:""}); alert("Rejected"); loadAllData(); }
+  window.deleteUser = async function(userId){
+    if(!confirm("Delete this user?")) return;
+    await deleteDoc(doc(db, "users", userId));
+    loadAllData();
+  }
+
+  window.showPublicPage = function(fundId){
+    const f = fundraisers.find(x=>x.id==fundId && x.status=="approved");
+    if(!f) return app.innerHTML = "<h2>Fundraiser Not Found</h2>";
+    let raised = donations.filter(d=>d.fundId==f.id).reduce((a,b)=>a+b.amount,0);
+    let percent = Math.min(100, Math.round(raised/f.target*100));
+
+    app.innerHTML = `
+    <div class="card">
+      <h2>${f.title}</h2>
+      ${f.media? `<img src="${f.media}">` : ""}
+      <p>${f.story}</p>
+      <h4>Target: ${f.target.toLocaleString()} UGX</h4>
+      <div class="progress"><div class="progress-bar" style="width:${percent}%">${percent}%</div></div>
+      <h4>Raised: ${raised.toLocaleString()} UGX</h4>
+      <h3>💚 Support ${f.bankHolder}</h3>
+      <button onclick="document.getElementById('donateOptions').classList.toggle('hidden')">Donate Now</button>
+      <div id="donateOptions" class="hidden">
+        <div class="donate-option">
+          <h4><span style="color:#d4a000">MTN</span> Mobile Money</h4>
+          <p><b>Number:</b> ${f.mtn}</p>
+          <p><b>Names:</b> ${f.bankHolder}</p>
+          <button class="btn-mtn" onclick="donate('MTN', '${f.id}')">Donate via MTN</button>
+        </div>
+        <div class="donate-option">
+          <h4><span style="color:#cc0000">AIRTEL</span> Money</h4>
+          <p><b>Number:</b> ${f.airtel}</p>
+          <p><b>Names:</b> ${f.bankHolder}</p>
+          <button class="btn-airtel" onclick="donate('Airtel', '${f.id}')">Donate via Airtel</button>
+        </div>
+        <div class="donate-option">
+          <h4>🏦 Bank Transfer</h4>
+          <p><b>Bank:</b> ${f.bankName}</p>
+          <p><b>Account:</b> ${f.bankAccount}</p>
+          <p><b>Names:</b> ${f.bankHolder}</p>
+          <p><b>SWIFT:</b> ${f.swift}</p>
+          <button class="btn-bank" onclick="donate('Bank', '${f.id}')">🏦 Donate via Bank</button>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  window.donate = async function(method, fundId){
+    const name = prompt("Your Full Names:");
+    const amount = prompt("How much UGX do you want to donate?");
+    if(!name ||!amount) return;
+    await addDoc(collection(db, "donations"), {fundId, name, amount:parseInt(amount), method, date:new Date()});
+    const f = fundraisers.find(x=>x.id==fundId);
+    alert(`Thank you ${name}! Send ${amount} UGX via ${method} to ${f.bankHolder}`);
+    showPublicPage(fundId);
+  }
+
+  window.logout = function(){ currentUser=null; sessionStorage.clear(); location.reload(); }
+</script>
+</body>
+</html>
