@@ -1,1 +1,335 @@
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0B3D0B">
+<meta id="ogSite" property="og:site_name" content="Yamba Muno">
+<meta id="ogUrl" property="og:url" content="">
+<meta id="ogTitle" property="og:title" content="Yamba Muno - Transparent Fundraising Uganda">
+<meta id="ogDesc" property="og:description" content="Support someone in need through Yamba Muno">
+<meta id="ogImg" property="og:image" content="https://i.imgur.com/8Km9tLL.png">
+<title>Yamba Muno</title>
+<style>
+:root{--green:#0B3D0B;--gold:#D4AF37;--light:#F8F9FA;--red:#B00020}
+*{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial}
+body{background:var(--light);color:#222;padding-bottom:80px}
+header{background:var(--green);color:white;padding:14px;text-align:center;position:sticky;top:0;z-index:10}
+header h1{font-size:22px;letter-spacing:1px}.admin-icon{position:absolute;left:12px;top:12px;background:none;border:none;font-size:22px;cursor:pointer;color:var(--gold)}
+.container{max-width:720px;margin:15px auto;padding:12px}
+.card{background:white;border-radius:12px;padding:18px;margin-bottom:14px;box-shadow:0 2px 10px rgba(0,0,0,0.06)}
+h2,h3,h4{color:var(--green);margin-bottom:10px}
+input,textarea,select{width:100%;padding:14px;margin:8px 0;border:1px solid #ccc;border-radius:8px;font-size:16px}
+button{background:var(--green);color:white;padding:15px 16px;border:none;border-radius:8px;cursor:pointer;font-weight:600;width:100%;font-size:16px;margin-top:8px}
+button:active{transform:scale(0.98)} button.gold{background:var(--gold);color:#000} button.donate{background:var(--gold);color:#000;font-size:18px}
+button.whatsapp{background:#25D366} button.danger{background:var(--red)} button.warn{background:#FF8F00} button.mtn{background:#FFCC00;color:#000} button.airtel{background:#E4002B} button.stripe{background:#635BFF} button.secondary{background:#555}
+.hidden{display:none} img{max-width:100%;border-radius:10px;margin:10px 0} #previewImg{max-height:220px;object-fit:cover;width:100%}
+.progress{height:20px;background:#e0e0e0;border-radius:10px;overflow:hidden;margin:12px 0}
+.progress-bar{height:100%;background:var(--green);text-align:center;color:white;font-size:12px;line-height:20px;font-weight:bold}
+.fee-box{background:#E8F5E9;border-left:4px solid var(--green);padding:12px;border-radius:6px;font-size:13px}
+.payment-box{border:2px solid var(--gold);padding:14px;border-radius:10px;background:#FFF8E1;margin:10px 0}
+.proof-item{border-left:4px solid var(--gold);padding:12px;background:#FFF8E1;margin:8px 0;border-radius:6px;font-size:13px}
+.method-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.checkbox-group{display:flex;align-items:start;gap:10px;margin:14px 0;padding:12px;background:#F5F5F5;border-radius:8px;font-size:13px}
+.success-box{background:#E8F5E9;border:2px solid var(--green);padding:15px;border-radius:10px;text-align:center}
+.link-box{display:flex;gap:8px}.link-box input{flex:1}
+.donor-header img{width:100%;height:250px;object-fit:cover;border-radius:12px}
+.fund-card{border:1px solid #ddd;padding:12px;border-radius:10px;margin:10px 0;position:relative}.fund-card.active{border:2px solid var(--green)}.fund-card.deleted{opacity:0.5;background:#F5F5F5}
+.fund-card img{width:100%;height:120px;object-fit:cover;border-radius:8px}
+.delete-btn{position:absolute;top:10px;right:10px;background:var(--red);color:white;border:none;padding:6px 10px;border-radius:6px;font-size:12px;width:auto}
+.tabs{display:flex;gap:8px;margin-bottom:12px}.tab{flex:1;padding:10px;border:1px solid var(--green);background:white;color:var(--green);border-radius:8px}.tab.active{background:var(--green);color:white}
+.loader{text-align:center;padding:20px;color:var(--green)}
+footer{text-align:center;padding:20px;font-size:12px;color:#666}
+</style>
+</head>
+<body>
+<header><button class="admin-icon" onclick="showAdminLogin()">💚</button><div><h1>Yamba Muno</h1><p style="font-size:12px">yambamuno.com</p></div></header>
+<div class="container"><div id="app"><div class="loader">Loading Yamba Muno...</div></div><div id="dashboard" class="hidden"></div><div id="admin" class="hidden"></div><div id="donorPage" class="hidden"></div></div>
+
+<footer><a href="https://wa.me/256780420041" target="_blank"><button class="whatsapp">💬 Customer Care</button></a><p style="margin-top:8px">© 2026 yambamuno.com | 9% Platform Fee</p></footer>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
+import { getDatabase, ref, set, get, child, update } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js";
+import { getStorage, ref as storageRef, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-storage.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyApNYOw-a9w7m51JCCOhP0EVRiVyx5JPrw",
+  authDomain: "yamba-muno.firebaseapp.com",
+  databaseURL: "https://yamba-muno-default-rtdb.firebaseio.com",
+  projectId: "yamba-muno",
+  storageBucket: "yamba-muno.firebasestorage.app",
+  messagingSenderId: "507076898780",
+  appId: "1:507076898780:web:c742dfcadbe635a568a919"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const storage = getStorage(app);
+const dbRef = ref(db);
+
+let currentUser=JSON.parse(sessionStorage.getItem('ym_current'))||null;
+const ADMIN_EMAIL="admin@yambamuno.com"; const ADMIN_PASS="Kalungi123"; const ADMIN_NAME="Lubinga Alosious";
+const PLATFORM_PERCENT=9; const ADMIN_MTN="+256788417769"; const ADMIN_AIRTEL="+256743830346";
+const STRIPE_LINK="https://buy.stripe.com/8x214o2awd8l8ym7PhfjG00";
+const DEFAULT_IMG = "https://i.imgur.com/8Km9tLL.png";
+const BASE_URL = window.location.origin + window.location.pathname;
+const SITE_NAME = "Yamba Muno";
+
+init();
+async function init(){updateMetaForPreview(); showPage();}
+
+function formatPhone(n){return"+256"+n.replace(/\D/g,'').slice(-9);}
+function slugify(text){return text.toString().toLowerCase().replace(/\s+/g, '-').replace(/[^\w\-]+/g, '').substring(0,30);}
+
+async function updateMetaForPreview(){
+  const urlParams=new URLSearchParams(window.location.search);
+  if(urlParams.has('f')){
+    const fId=urlParams.get('f');
+    const snapshot = await get(child(dbRef, `fundraisers/${fId}`));
+    if(snapshot.exists()){
+      let f = snapshot.val();
+      const userSnap = await get(child(dbRef, `users/${f.userId}`));
+      let beneficiary = userSnap.exists()? userSnap.val().name : 'Beneficiary';
+      document.getElementById('ogSite').setAttribute('content', SITE_NAME);
+      document.getElementById('ogTitle').setAttribute('content', f.title);
+      document.getElementById('ogDesc').setAttribute('content', `Support ${beneficiary}: ${f.story.substring(0,150)}... Goal: ${f.target.toLocaleString()} UGX`);
+      document.getElementById('ogImg').setAttribute('content', f.media);
+      document.getElementById('ogUrl').setAttribute('content', window.location.href);
+      document.title = f.title + " | " + SITE_NAME;
+    }
+  }
+}
+
+async function showPage(){
+  const urlParams=new URLSearchParams(window.location.search);
+  if(urlParams.has('f')){
+    // Keep the URL so refresh doesn't jump
+    history.replaceState(null, '', window.location.href);
+    showDonorPage(urlParams.get('f'));
+  } else if(currentUser){
+    currentUser.id==="admin"?showAdmin():showDashboard();
+  } else{
+    showAuthPage();
+  }
+}
+
+function showAuthPage(){document.getElementById('app').innerHTML=`<div class="card"><h2>Start Your Fundraiser</h2><input id="authName" placeholder="Your Full Names"><div style="display:flex"><div style="padding:14px;background:#eee;border-radius:8px 0 0 8px">+256</div><input id="authPhone" placeholder="788417769" maxlength="9" inputmode="numeric" style="border-radius:0 8px 8px 0"></div><input id="authPass" type="password" placeholder="Create Password"><button onclick="signup()">Create Account</button><button onclick="login()" style="background:#555">Login</button></div>`;}
+window.showAdminLogin=async function(){const e=prompt("Admin Email:"),p=prompt("Password:"); if(e==ADMIN_EMAIL&&p==ADMIN_PASS){saveSession({name:"Admin",id:"admin"});showAdmin();}else if(e)alert("Wrong login");}
+window.signup=async function(){if(!authName.value||!authPhone.value||!authPass.value)return alert("Fill all"); const id=Date.now().toString(); await set(ref(db, 'users/' + id),{name:authName.value,phone:formatPhone(authPhone.value),pass:authPass.value,id}); alert("Account Created"); location.reload();}
+window.login=async function(){const phone=formatPhone(authPhone.value); const snapshot = await get(child(dbRef, `users/`)); let user=null; snapshot.forEach(child=>{if(child.val().phone==phone&&child.val().pass==authPass.value)user=child.val()}); if(!user)return alert("Wrong details"); saveSession(user);showDashboard();}
+function saveSession(user){currentUser=user;sessionStorage.setItem('ym_current',JSON.stringify(user));}
+
+window.showDashboard=async function(){
+  document.getElementById('app').classList.add('hidden');document.getElementById('admin').classList.add('hidden');document.getElementById('donorPage').classList.add('hidden');document.getElementById('dashboard').classList.remove('hidden');
+
+  const snapshot = await get(child(dbRef, `fundraisers/`));
+  let allMyFunds=[]; snapshot.forEach(child=>{if(child.val().userId==currentUser.id)allMyFunds.push(child.val())});
+  let activeFunds=allMyFunds.filter(f=>f.status!="deleted");
+  let historyFunds=allMyFunds.filter(f=>f.status=="deleted");
+
+  async function renderFunds(list){
+    if(list.length==0) return '<p style="color:#888">No fundraisers here yet</p>';
+    let html='';
+    for(let f of list){
+      const donsSnap = await get(child(dbRef, `donations/`));
+      let myDons=[]; donsSnap.forEach(d=>{if(d.val().fundId==f.id)myDons.push(d.val())});
+      let gross=myDons.reduce((a,b)=>a+b.amount,0); let pct=Math.min(100,Math.round(gross/f.target*100));
+      const link=BASE_URL+"?f="+f.slug;
+      let delTag = f.status=="deleted"?`<p style="color:red;font-size:12px">Closed on: ${f.deletedAt}</p>`:"";
+      html+=`<div class="fund-card ${f.status=='approved'?'active':''} ${f.status=='deleted'?'deleted':''}"><img src="${f.media}"><button class="delete-btn" onclick="deleteFund('${f.id}','user')">Delete</button><h4>${f.title}</h4>
+        <p>Status: <b>${f.status}</b> | Raised: <b>${gross.toLocaleString()} UGX</b> of ${f.target.toLocaleString()}</p>
+        <div class="progress"><div class="progress-bar" style="width:${pct}%">${pct}%</div></div>
+        ${delTag}
+        <div class="link-box"><input value="${link}" readonly><button style="width:100px" onclick="navigator.clipboard.writeText('${link}')">Copy</button></div>
+        <button onclick="viewFund('${f.id}')">View Details</button></div>`
+    }
+    return html;
+  }
+
+  document.getElementById('dashboard').innerHTML=`<div class="card"><h2>Welcome, ${currentUser.name}</h2><button class="danger" onclick="logout()">Logout</button></div>
+  <div class="card"><div class="tabs"><button class="tab active" onclick="showTab('active',this)">Active</button><button class="tab" onclick="showTab('history',this)">History</button></div>
+  <div id="activeTab">${await renderFunds(activeFunds)}</div><div id="historyTab" class="hidden">${await renderFunds(historyFunds)}</div>
+  <button class="gold" onclick="showCreateForm()">+ Create New Fundraiser</button></div>`;
+}
+
+window.showTab=function(tab,btn){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('activeTab').classList.add('hidden');
+  document.getElementById('historyTab').classList.add('hidden');
+  document.getElementById(tab+'Tab').classList.remove('hidden');
+}
+
+window.viewFund=async function(fid){const snap=await get(child(dbRef, `fundraisers/${fid}`)); const f=snap.val(); if(!f)return;
+  const donsSnap = await get(child(dbRef, `donations/`)); let myDons=[]; donsSnap.forEach(d=>{if(d.val().fundId==f.id)myDons.push(d.val())});
+  let gross=myDons.reduce((a,b)=>a+b.amount,0); let platformFee=Math.round(gross*PLATFORM_PERCENT/100); let net=gross-platformFee; let pct=Math.min(100,Math.round(gross/f.target*100)); const link=BASE_URL+"?f="+f.slug;
+  document.getElementById('dashboard').innerHTML=`<div class="card"><img src="${f.media}"><h2>${f.title}</h2><p><b>By:</b> ${currentUser.name}</p><div class="progress"><div class="progress-bar" style="width:${pct}%">${pct}% Raised</div></div>
+  <div class="card"><h3>Share Your Fundraiser</h3><div class="link-box"><input value="${link}" readonly><button style="width:100px" onclick="navigator.clipboard.writeText('${link}')">Copy</button></div><button onclick="window.open('https://wa.me/?text=${encodeURIComponent(SITE_NAME + ': '+link)}','_blank')" class="whatsapp">Share on WhatsApp</button></div>
+  <div class="card"><h3>Earnings Summary</h3><p>Total Raised: <b>${gross.toLocaleString()} UGX</b></p><p>Platform Fee 9%: <b>-${platformFee.toLocaleString()} UGX</b></p><p style="color:var(--green);font-size:18px">You Receive: <b>${net.toLocaleString()} UGX</b></p><hr><h4>Payout Details</h4><p><b>Method:</b> ${f.payoutMethod}</p><p><b>Details:</b> ${JSON.stringify(f.payoutDetails)}</p></div>
+  ${f.status!="deleted"?`<button class="danger" onclick="deleteFund('${f.id}','user')">Close Fundraiser</button>`:""}
+  <button class="secondary" onclick="showDashboard()">← Back to Dashboard</button>`; }
+
+window.showCreateForm=function(){
+  document.getElementById('dashboard').innerHTML=`<div class="card" id="createForm"><h3>Create New Fundraiser</h3><input id="fundTitle" placeholder="Fundraiser Title"><input id="fundTarget" type="number" placeholder="Target Amount UGX"><textarea id="fundStory" placeholder="Tell your story..." rows="4"></textarea>
+  <label><b>Upload Cover Photo</b></label><input id="fundMedia" type="file" accept="image/*" onchange="previewImage(event)"><img id="previewImg" class="hidden">
+  <h4>Payout Details - Only You and Admin See This</h4><select id="payoutMethod" onchange="showPayout()"><option value="">Select Payout Method</option><option value="MTN">MTN Mobile Money</option><option value="Airtel">Airtel Money</option><option value="Bank">Bank Account</option></select><div id="payoutFields"></div>
+  <div class="checkbox-group"><input type="checkbox" id="agreeTerms"><label><b>I authorize Yamba Muno</b> to collect donations on my behalf. 9% platform fee applies.</label></div>
+  <button class="gold" onclick="launchFundraiser()">Launch Fundraiser</button><button class="secondary" onclick="showDashboard()">← Cancel</button></div>`; }
+
+window.previewImage=function(e){const file=e.target.files[0]; if(file){const rd=new FileReader(); rd.onload=ev=>{previewImg.src=ev.target.result; previewImg.classList.remove('hidden');}; rd.readAsDataURL(file);}}
+window.showPayout=function(){
+  const m=payoutMethod.value;
+  if(m=="MTN"||m=="Airtel"){payoutFields.innerHTML=`<div style="display:flex"><div style="padding:14px;background:#eee;border-radius:8px 0 0 8px">${m}</div><input id="payoutNumber" maxlength="9" placeholder="788417769" inputmode="numeric" style="border-radius:0 8px 8px 0"></div><input id="payoutNames" placeholder="Registered Names on this MM Number">`}
+  else if(m=="Bank"){payoutFields.innerHTML=`<input id="bankName" placeholder="Bank Name"><input id="bankHolder" placeholder="Account Name"><input id="bankAccount" placeholder="Account Number">`}
+  else{payoutFields.innerHTML=""}
+}
+
+window.launchFundraiser=async function(){
+  try{
+    const btn = event.target;
+    btn.disabled=true; btn.innerText="Launching...";
+
+    if(!document.getElementById('agreeTerms').checked) return alert("⚠️ You must agree to terms");
+    if(!fundTitle.value||!fundTarget.value||!payoutMethod.value) return alert("⚠️ Fill Title, Target and Payout Method");
+    const file=fundMedia.files[0];
+
+    let mediaURL = DEFAULT_IMG;
+    if(file){
+      btn.innerText="Uploading Image...";
+      const reader = new FileReader();
+      const base64 = await new Promise(resolve=>{reader.onload = e => resolve(e.target.result); reader.readAsDataURL(file);});
+      const imgRef = storageRef(storage, 'fundraisers/' + Date.now() + '.jpg');
+      const upload = await uploadString(imgRef, base64, 'data_url');
+      mediaURL = await getDownloadURL(upload.ref);
+    }
+
+    btn.innerText="Saving...";
+    const id=Date.now().toString(); const slug=slugify(fundTitle.value)+"-"+id.slice(-4);
+    const m=payoutMethod.value;
+    let pd = {};
+    if(m=="Bank"){pd={bankName:bankName?.value||"",bankHolder:bankHolder?.value||"",bankAccount:bankAccount?.value||""};}
+    else{pd={number:payoutNumber?formatPhone(payoutNumber.value):"", names:payoutNames?.value||""};}
+    if((m=="MTN"||m=="Airtel")&&!pd.names) {alert("⚠️ Enter Registered Names on MM number"); btn.disabled=false; btn.innerText="Launch Fundraiser"; return;}
+
+    await set(ref(db, 'fundraisers/' + id),{id,userId:currentUser.id,title:fundTitle.value,slug,target:+fundTarget.value,story:fundStory.value,media:mediaURL,payoutMethod:m,payoutDetails:pd,agreed:true,status:"approved",created:Date.now()});
+
+    const link=BASE_URL+"?f="+slug;
+    alert("🎉 Fundraiser Launched!\n\nYour Donation Link:\n" + link);
+    showDashboard();
+  }catch(err){alert("Launch Error: " + err.message); console.log(err); document.querySelector('#createForm button.gold').disabled=false; document.querySelector('#createForm button.gold').innerText="Launch Fundraiser";}
+}
+
+window.deleteFund=async function(fid,by){
+  if(!confirm("Close this fundraiser? Donors will no longer be able to donate.")) return;
+  await update(ref(db, 'fundraisers/' + fid),{status:"deleted",deletedBy:by,deletedAt:new Date().toLocaleString()});
+  alert("Fundraiser moved to History.");
+  by=="admin"?showAdmin():showDashboard();
+}
+
+// FULL DONOR PAGE - SHOWS NAME, TOPIC, STORY, PICTURE, AMOUNT
+window.showDonorPage=async function(slug){
+  const snap = await get(child(dbRef, `fundraisers/`)); let f=null; snap.forEach(c=>{if(c.val().slug==slug)f=c.val()});
+  if(!f || f.status=="deleted")return document.getElementById('app').innerHTML="<div class='card'><h2>Campaign Closed</h2><p>This fundraiser is no longer active.</p></div>";
+  const userSnap = await get(child(dbRef, `users/${f.userId}`)); const beneficiary = userSnap.exists()? userSnap.val().name : 'Beneficiary';
+
+  const donsSnap = await get(child(dbRef, `donations/`)); let raised=0; donsSnap.forEach(d=>{if(d.val().fundId==f.id)raised+=d.val().amount});
+  let pct=Math.min(100,Math.round(raised/f.target*100));
+
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('donorPage').classList.remove('hidden');
+  document.getElementById('donorPage').innerHTML=`
+  <a href="https://wa.me/256780420041" target="_blank"><button class="whatsapp">💬 Need Help? Contact Customer Care</button></a>
+  <div class="card donor-header">
+    <img src="${f.media}">
+    <h2>${f.title}</h2>
+    <p><b>Organized by:</b> ${beneficiary}</p>
+    <p style="margin:12px 0;line-height:1.6">${f.story}</p>
+    <h3>Fundraising Goal: ${f.target.toLocaleString()} UGX</h3>
+    <div class="progress"><div class="progress-bar" style="width:${pct}%">${pct}% Raised - ${raised.toLocaleString()} UGX</div></div>
+    <div class="fee-box">91% goes directly to ${beneficiary}. 9% supports Yamba Muno operations.</div>
+    <button class="donate" onclick="showDonationSteps('${f.id}','${beneficiary}')">❤️ Donate Now</button>
+    <div id="donationSteps" class="hidden"></div>
+  </div>`;
+}
+
+window.showDonationSteps=function(fid,recipient){
+  donationSteps.classList.remove('hidden');
+  donationSteps.innerHTML=`<div class="card">
+    <h3>Your Information</h3>
+    <input id="donorName" placeholder="Your Name - Leave blank for Anonymous">
+    <input id="donorAmount" type="number" placeholder="Donation Amount UGX" inputmode="numeric">
+    <button class="gold" onclick="showPaymentOptions('${fid}','${recipient}')">Continue</button>
+  </div>`;
+}
+
+window.showPaymentOptions=function(fid,recipient){
+  const amt = donorAmount.value;
+  if(!amt) return alert("Please enter amount");
+  donationSteps.innerHTML=`<div class="card">
+    <h3>Choose Payment Method for ${parseInt(amt).toLocaleString()} UGX</h3>
+    <div class="method-grid">
+      <button class="stripe" onclick="showStripePay('${fid}','${recipient}','${amt}')">Card</button>
+      <button class="mtn" onclick="showManualPay('MTN','${fid}','${recipient}','${amt}')">MTN</button>
+      <button class="airtel" onclick="showManualPay('Airtel','${fid}','${recipient}','${amt}')">Airtel</button>
+    </div>
+    <div id="manualPayBox"></div>
+  </div>`;
+}
+
+window.showStripePay=function(fid,recipient,amt){manualPayBox.innerHTML=`<div class="payment-box"><h3>Pay with Card</h3><p>Secure payment via Stripe. No proof needed.</p><button onclick="window.open('${STRIPE_LINK}','_blank')">Pay ${parseInt(amt).toLocaleString()} UGX</button></div>`;}
+
+window.showManualPay=function(method,fid,recipient,amt){
+  const number=method=="MTN"?ADMIN_MTN:ADMIN_AIRTEL;
+  manualPayBox.innerHTML=`<div class="payment-box">
+    <h3>Send ${parseInt(amt).toLocaleString()} UGX via ${method} Money</h3>
+    <h2 style="color:var(--green)">${number}</h2>
+    <p><b>Account Name:</b> ${ADMIN_NAME}</p>
+    <p><b>Reference:</b> Donation for ${recipient}</p>
+    <p style="color:red;font-size:13px">After sending, paste the transaction SMS below</p>
+    <input id="donorProof" placeholder="Paste Transaction SMS/ID">
+    <button onclick="processDonate('${fid}','${recipient}','${method}','${amt}')">Submit Proof</button>
+  </div>`;
+}
+
+window.processDonate=async function(fid,recipient,method,amt){
+  let name=donorName.value||"Anonymous"; const proof=donorProof.value;
+  if(!proof)return alert("Please paste transaction SMS/ID");
+  const id=Date.now().toString();
+  await set(ref(db, 'proofs/' + id),{fundId:fid,donorName:name,amount:+amt,method,proof,date:new Date().toLocaleString(),type:"donation", status:"pending"});
+  manualPayBox.innerHTML=`<div class="success-box"><h2>Thank You ${name}!</h2><p>Your donation of ${parseInt(amt).toLocaleString()} UGX is pending verification.</p></div>`;
+}
+
+// ADMIN
+window.showAdmin=async function(){document.getElementById('app').classList.add('hidden');document.getElementById('dashboard').classList.add('hidden');document.getElementById('donorPage').classList.add('hidden');document.getElementById('admin').classList.remove('hidden');
+  let html=`<h2>Admin Dashboard</h2><div class="card"><h4>Receiving Accounts</h4><p><b>MTN:</b> ${ADMIN_MTN}</p><p><b>Airtel:</b> ${ADMIN_AIRTEL}</p><p><b>Name:</b> ${ADMIN_NAME}</p></div><h3>Pending Donations</h3>`;
+
+  const proofsSnap = await get(child(dbRef, `proofs/`));
+  proofsSnap.forEach(p=>{if(p.val().type=="donation"&&p.val().status=="pending"){
+    let pr = p.val();
+    html+=`<div class="proof-item"><h4>${pr.donorName}</h4><p><b>Amount:</b> ${pr.amount.toLocaleString()} UGX via ${pr.method}</p><p><b>Ref:</b> ${pr.proof}</p><button class="warn" onclick="approveDonation('${pr.fundId}','${pr.donorName}',${pr.amount},'${pr.method}','${p.key}')">Approve</button></div>`
+  }});
+
+  const usersSnap = await get(child(dbRef, `users/`));
+  html+=`<h3>All Users & Fundraisers</h3>`;
+  for(let uSnap of Object.values(await (await get(child(dbRef, `users/`))).val() || {})){if(uSnap.id!="admin"){
+    html+=`<div class="card"><h4>${uSnap.name} - ${uSnap.phone}</h4>`;
+    const fSnap = await get(child(dbRef, `fundraisers/`));
+    fSnap.forEach(f=>{if(f.val().userId==uSnap.id){
+      let delTag = f.val().status=="deleted"?`<span style="color:red"> [CLOSED at ${f.val().deletedAt}]</span>`:"";
+      html+=`<div class="fund-card ${f.val().status=='deleted'?'deleted':''}"><img src="${f.val().media}"><button class="delete-btn" onclick="deleteFund('${f.val().id}','admin')">Delete</button><p><b>${f.val().title}</b>${delTag}</p><p><b>Payout:</b> ${f.val().payoutMethod} - ${JSON.stringify(f.val().payoutDetails)}</p></div>`
+    }})}
+    html+=`</div>`
+  }});
+  document.getElementById('admin').innerHTML=html+`<button onclick="logout()">Logout</button>`;}
+
+window.approveDonation=async function(fid,name,amt,method,proofId){
+  const id=Date.now().toString();
+  await set(ref(db, 'donations/' + id),{fundId:fid,name,amount:amt,method,date:Date.now(),status:"Verified"});
+  await update(ref(db, 'proofs/' + proofId),{status:"Verified"});
+  alert("Donation Approved"); location.reload();
+}
+window.logout=function(){currentUser=null;sessionStorage.clear();location.reload();}
+</script>
+</body></html>
