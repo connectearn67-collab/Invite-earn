@@ -1,1 +1,166 @@
 
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
+import { getDatabase, ref, set, get, child, update, push } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js";
+import { getStorage, ref as storageRef, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-storage.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyApNYOw-a9w7m51JCCOhP0EVRiVyx5JPrw",
+  authDomain: "yamba-muno.firebaseapp.com",
+  databaseURL: "https://yamba-muno-default-rtdb.firebaseio.com",
+  projectId: "yamba-muno",
+  storageBucket: "yamba-muno.firebasestorage.app",
+  messagingSenderId: "507076898780",
+  appId: "1:507076898780:web:c742dfcadbe635a568a919"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const storage = getStorage(app);
+const dbRef = ref(db);
+
+let currentUser=JSON.parse(sessionStorage.getItem('ym_current'))||null;
+const ADMIN_EMAIL="admin@yambamuno.com";
+const ADMIN_PASS="Kalungi123";
+const ADMIN_NAME="Lubinga Alosious";
+const PLATFORM_PERCENT=9;
+const ADMIN_MTN="+256788417769";
+const ADMIN_AIRTEL="+256743830346";
+const DEFAULT_IMG = "https://i.imgur.com/8Km9tLL.png";
+const BASE_URL = window.location.origin;
+
+init();
+async function init(){ showPage(); }
+
+function saveSession(user){currentUser=user;sessionStorage.setItem('ym_current',JSON.stringify(user));}
+function formatPhone(n){return"+256"+n.replace(/\D/g,'').slice(-9);}
+function slugify(text){return text.toString().toLowerCase().replace(/\s+/g, '-').replace(/[^\w\-]+/g, '').substring(0,40);}
+
+async function showPage(){
+  const urlParams=new URLSearchParams(window.location.search);
+  if(urlParams.has('f')){ await showDonorPage(urlParams.get('f')); }
+  else if(currentUser){ currentUser.id==="admin"?showAdmin():showDashboard(); }
+  else{ showAuthPage(); }
+}
+
+function showAuthPage(){
+  document.getElementById('app').innerHTML=`<div class="card"><h2>Start Your Fundraiser</h2><input id="authName" placeholder="Your Full Names"><div style="display:flex"><div style="padding:14px;background:#eee;border-radius:8px 0 0 8px">+256</div><input id="authPhone" placeholder="788417769" maxlength="9" inputmode="numeric" style="border-radius:0 8px 8px 0"></div><input id="authPass" type="password" placeholder="Create Password"><button onclick="signup()">Create Account</button><button onclick="login()" style="background:#555">Login</button></div>`;
+}
+
+window.showAdminLogin=async function(){const e=prompt("Admin Email:"),p=prompt("Password:"); if(e==ADMIN_EMAIL&&p==ADMIN_PASS){saveSession({name:"Admin",id:"admin"});showAdmin();}else if(e)alert("Wrong login");}
+
+window.signup=async function(){
+  if(!authName.value||!authPhone.value||!authPass.value)return alert("Fill all");
+  const id=Date.now().toString();
+  await set(ref(db,'users/'+id),{name:authName.value,phone:formatPhone(authPhone.value),pass:authPass.value,id,created:Date.now()});
+  alert("Account Created"); location.reload();
+}
+
+window.login=async function(){
+  const phone=formatPhone(authPhone.value);
+  const snap=await get(child(dbRef,'users/')); let user=null;
+  if(snap.exists()){snap.forEach(c=>{if(c.val().phone==phone&&c.val().pass==authPass.value)user=c.val()})};
+  if(!user)return alert("Wrong details");
+  saveSession(user); showDashboard();
+}
+
+window.showDashboard=async function(){
+  document.getElementById('app').classList.add('hidden');document.getElementById('admin').classList.add('hidden');document.getElementById('donorPage').classList.add('hidden');document.getElementById('dashboard').classList.remove('hidden');
+
+  const fundsSnap=await get(child(dbRef,'fundraisers/'));
+  let myFund=null; if(fundsSnap.exists()){fundsSnap.forEach(c=>{if(c.val().userId==currentUser.id)myFund=c.val()})}
+
+  const donsSnap=await get(child(dbRef,'donations/')); let myDons=[]; if(donsSnap.exists()){donsSnap.forEach(d=>{if(d.val().fundId==myFund?.id && d.val().status=="Verified")myDons.push(d.val())})}
+  let gross=myDons.reduce((a,b)=>a+b.amount,0); let platformFee=Math.round(gross*PLATFORM_PERCENT/100); let net=gross-platformFee;
+
+  let section="";
+  if(myFund){
+    const link=`${BASE_URL}?f=${myFund.slug}`;
+    section=`<div class="success-box"><h3>🎉 Your Fundraiser is LIVE!</h3><p>Share this link:</p><input value="${link}" readonly style="text-align:center;font-weight:bold"><button onclick="navigator.clipboard.writeText('${link}')">Copy Link</button></div>
+    <div class="card"><h3>📊 Earnings</h3><p>Total Raised: <b>${gross.toLocaleString()} UGX</b></p><p>Yamba Muno Fee 9%: <b>-${platformFee.toLocaleString()} UGX</b></p><p style="color:var(--green);font-size:18px">You Receive: <b>${net.toLocaleString()} UGX</b></p></div>`;
+  }
+
+  document.getElementById('dashboard').innerHTML=`<div class="card"><h2>Hi ${currentUser.name}</h2><button class="danger" onclick="logout()">Logout</button></div>${!myFund?`<div class="card"><h3>Create Fundraiser</h3><input id="fundTitle" placeholder="What is this for? e.g John School Fees"><input id="fundTarget" type="number" placeholder="Target Amount UGX" inputmode="numeric"><textarea id="fundStory" placeholder="Tell your story..." rows="4"></textarea>
+  <label><b>Upload Photo</b></label><input id="fundMedia" type="file" accept="image/*" onchange="previewImage(event)"><img id="previewImg" class="hidden">
+  <h4>Payout Details</h4><select id="payoutMethod" onchange="showPayout()"><option value="">Select Payout Method</option><option value="MTN">MTN Mobile Money</option><option value="Airtel">Airtel Money</option><option value="Bank">Bank Account</option></select><div id="payoutFields"></div>
+  <div class="checkbox-group"><input type="checkbox" id="agreeTerms"><label><b>I authorize Yamba Muno</b> to collect donations. 9% platform fee.</label></div>
+  <button class="gold" onclick="launchFundraiser(this)">Launch Fundraiser Now</button></div>`:section}`;
+}
+
+window.previewImage=function(e){const file=e.target.files[0]; if(file){const rd=new FileReader(); rd.onload=ev=>{previewImg.src=ev.target.result; previewImg.classList.remove('hidden');}; rd.readAsDataURL(file);}}
+window.showPayout=function(){const m=payoutMethod.value; if(m=="MTN"||m=="Airtel"){payoutFields.innerHTML=`<div style="display:flex"><div style="padding:14px;background:#eee;border-radius:8px 0 0 8px">${m}</div><input id="payoutNumber" maxlength="9" placeholder="788417769" inputmode="numeric" style="border-radius:0 8px 8px 0"></div><input id="payoutNames" placeholder="Registered Names">`} else if(m=="Bank"){payoutFields.innerHTML=`<input id="bankName" placeholder="Bank Name"><input id="bankHolder" placeholder="Account Name"><input id="bankAccount" placeholder="Account Number">`} else{payoutFields.innerHTML=""}}
+
+window.launchFundraiser=async function(btn){
+  btn.disabled=true; btn.innerText="Saving...";
+  try{
+    if(!agreeTerms.checked) throw new Error("You must agree to terms");
+    if(!fundTitle.value||!fundTarget.value||!payoutMethod.value) throw new Error("Fill all required fields");
+
+    const id=push(child(dbRef,'fundraisers/')).key;
+    const slug=slugify(fundTitle.value)+"-"+id.slice(-4);
+
+    let mediaURL = DEFAULT_IMG;
+    const file=fundMedia.files[0];
+    if(file){
+      const base64 = await new Promise((resolve)=>{const rd=new FileReader(); rd.onload=e=>resolve(e.target.result); rd.readAsDataURL(file);});
+      const imgRef=storageRef(storage,'funds/'+id+'.jpg');
+      const up=await uploadString(imgRef,base64,'data_url');
+      mediaURL=await getDownloadURL(up.ref);
+    }
+
+    const m=payoutMethod.value;
+    let pd = {};
+    if(m=="Bank"){ pd={bankName:bankName.value,bankHolder:bankHolder.value,bankAccount:bankAccount.value}; }
+    else{ pd={number:formatPhone(payoutNumber.value), names:payoutNames.value}; }
+
+    await set(ref(db,'fundraisers/'+id),{
+      id,userId:currentUser.id,title:fundTitle.value,slug,target:+fundTarget.value,story:fundStory.value,media:mediaURL,payoutMethod:m,payoutDetails:pd,agreed:true,status:"approved",created:Date.now()
+    });
+
+    const link=`${BASE_URL}?f=${slug}`;
+    alert("🎉 Launched!\n\nShare Link:\n" + link);
+    location.reload();
+
+  }catch(err){ alert("Error: " + err.message); btn.disabled=false; btn.innerText="Launch Fundraiser Now"; }
+}
+
+window.showDonorPage=async function(slug){
+  const snap=await get(child(dbRef,'fundraisers/')); let f=null; if(snap.exists()){snap.forEach(c=>{if(c.val().slug==slug)f=c.val()})}
+  if(!f)return document.getElementById('app').innerHTML="<div class='card'><h2>Fundraiser Not Found</h2></div>";
+
+  const userSnap=await get(child(dbRef,'users/'+f.userId)); const beneficiary = userSnap.exists()?userSnap.val().name:'Beneficiary';
+  const donsSnap=await get(child(dbRef,'donations/')); let raised=0; if(donsSnap.exists()){donsSnap.forEach(d=>{if(d.val().fundId==f.id && d.val().status=="Verified")raised+=d.val().amount})}
+  let pct=Math.min(100,Math.round(raised/f.target*100));
+
+  // UPDATE OG TAGS FOR SOCIAL MEDIA
+  document.getElementById('ogTitle').setAttribute('content', f.title);
+  document.getElementById('ogDesc').setAttribute('content', `Support ${beneficiary}: ${f.story.substring(0,120)}...`);
+  document.getElementById('ogImg').setAttribute('content', f.media);
+  document.getElementById('ogUrl').setAttribute('content', window.location.href);
+  document.title = `${f.title} | Yamba Muno`;
+
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('donorPage').classList.remove('hidden');
+  document.getElementById('donorPage').innerHTML=`<div class="card"><h2>${f.title}</h2><p><b>Organized by:</b> ${beneficiary}</p>${f.media?`<img src="${f.media}">`:""}<p>${f.story}</p><h3>Goal: ${f.target.toLocaleString()} UGX</h3><div class="progress"><div class="progress-bar" style="width:${pct}%">${pct}% Raised - ${raised.toLocaleString()} UGX</div></div>
+  <div class="fee-box">91% goes to ${beneficiary}. 9% supports Yamba Muno.</div>
+  <button class="donate" onclick="donateForm.classList.toggle('hidden')">Donate Now</button></div>`;
+}
+
+window.showAdmin=async function(){
+  document.getElementById('app').classList.add('hidden');document.getElementById('dashboard').classList.add('hidden');document.getElementById('donorPage').classList.add('hidden');document.getElementById('admin').classList.remove('hidden');
+  let html=`<h2>🔒 Admin Dashboard</h2><div class="card"><p><b>MTN:</b> ${ADMIN_MTN}</p><p><b>Airtel:</b> ${ADMIN_AIRTEL}</p></div><h3>Pending Donations</h3>`;
+  const proofsSnap=await get(child(dbRef,'paymentProofs/'));
+  if(proofsSnap.exists()){proofsSnap.forEach(p=>{if(p.val().status=="pending"){
+    html+=`<div class="proof-item"><h4>${p.val().donorName} - ${p.val().amount.toLocaleString()} UGX</h4><p>Proof: ${p.val().proof}</p><button class="warn" onclick="approveDonation('${p.key}')">Approve</button></div>`}})};
+  document.getElementById('admin').innerHTML=html+`<button onclick="logout()">Logout</button>`;
+}
+window.approveDonation=async function(proofId){
+  const proofSnap=await get(child(dbRef,'paymentProofs/'+proofId)); const p=proofSnap.val();
+  const id=push(child(dbRef,'donations/')).key;
+  await set(ref(db,'donations/'+id),{fundId:p.fundId,name:p.donorName,amount:p.amount,method:p.method,date:Date.now(),status:"Verified"});
+  await update(ref(db,'paymentProofs/'+proofId),{status:"Verified"});
+  alert("Approved"); location.reload();
+}
+window.logout=function(){currentUser=null;sessionStorage.clear();location.reload();}
+</script>
